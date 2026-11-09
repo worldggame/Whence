@@ -184,10 +184,11 @@ export const CuratorModal: React.FC<CuratorModalProps> = ({
   }, [isOpen, currentDateKey]);
 
   // Check if this date has an explicitly programmed roster in calendarSchedules
-  const isExplicitlyProgrammed = calendarSchedules[selectedDate] !== undefined;
+  const isExplicitlyProgrammed =
+    Array.isArray(calendarSchedules[selectedDate]) && calendarSchedules[selectedDate].length > 0;
 
-  // Compute the 10-figure roster: if explicitly programmed (including empty [] when reset), use it;
-  // if not programmed, default to previous day's game!
+  // Compute the 10-figure roster: if explicitly programmed with figures, use it;
+  // if not programmed (or empty), default to previous day's game!
   const dateRoster: HistoricalFigure[] = isExplicitlyProgrammed
     ? calendarSchedules[selectedDate]
     : resolveGameRosterForDate(selectedDate, calendarSchedules);
@@ -224,12 +225,12 @@ export const CuratorModal: React.FC<CuratorModalProps> = ({
     }
   };
 
-  // RESET DAY: Completely empties the rotation so the curator can build all 10 from scratch
+  // RESET DAY: Clears explicit roster for this date so it defaults to the previous day
   const handleResetDay = () => {
     handleCancelEdit();
     onUpdateRosterForDate(selectedDate, []);
-    setStatusNotice(`Emptied rotation for ${formatFriendlyDate(selectedDate)} (0/10 figures).`);
-    setTimeout(() => setStatusNotice(null), 3000);
+    setStatusNotice(`Reset ${formatFriendlyDate(selectedDate)} (now defaults to previous day).`);
+    setTimeout(() => setStatusNotice(null), 3500);
   };
 
   // Start editing an existing figure from the roster
@@ -431,7 +432,13 @@ export const CuratorModal: React.FC<CuratorModalProps> = ({
 
   // Export full calendar schedules as schedules.json for GitHub deployment
   const handleExportAllSchedules = () => {
-    const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(calendarSchedules, null, 2));
+    const clean: Record<string, HistoricalFigure[]> = {};
+    for (const [k, v] of Object.entries(calendarSchedules)) {
+      if (Array.isArray(v) && v.length > 0) {
+        clean[k] = v;
+      }
+    }
+    const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(clean, null, 2));
     const downloadAnchor = document.createElement('a');
     downloadAnchor.setAttribute('href', dataStr);
     downloadAnchor.setAttribute('download', `schedules.json`);
@@ -444,7 +451,13 @@ export const CuratorModal: React.FC<CuratorModalProps> = ({
 
   // Copy full schedules JSON to clipboard for GitHub Web Editor
   const handleCopyAllSchedules = () => {
-    const json = JSON.stringify(calendarSchedules, null, 2);
+    const clean: Record<string, HistoricalFigure[]> = {};
+    for (const [k, v] of Object.entries(calendarSchedules)) {
+      if (Array.isArray(v) && v.length > 0) {
+        clean[k] = v;
+      }
+    }
+    const json = JSON.stringify(clean, null, 2);
     navigator.clipboard.writeText(json).then(() => {
       setCopiedAll(true);
       setStatusNotice('Copied schedules.json to clipboard! Paste into src/data/schedules.json in GitHub.');

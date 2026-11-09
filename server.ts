@@ -78,17 +78,23 @@ app.get('/api/schedules/:dateKey', (req, res) => {
     return res.json({ dateKey, roster: schedules[dateKey], isProgrammed: true });
   }
 
-  // If not programmed, default to previous day's programmed schedule
-  try {
-    const [y, m, d] = dateKey.split('-').map(Number);
-    const prevDate = new Date(Date.UTC(y, m - 1, d));
-    prevDate.setUTCDate(prevDate.getUTCDate() - 1);
-    const prevKey = `${prevDate.getUTCFullYear()}-${String(prevDate.getUTCMonth() + 1).padStart(2, '0')}-${String(prevDate.getUTCDate()).padStart(2, '0')}`;
-    if (Array.isArray(schedules[prevKey]) && schedules[prevKey].length > 0) {
-      return res.json({ dateKey, roster: schedules[prevKey], isProgrammed: false, defaultedFrom: prevKey });
-    }
-  } catch {
-    // fallback
+  // If not programmed or empty, look back to find the most recent programmed day before dateKey
+  const priorScheduledDates = Object.keys(schedules)
+    .filter((k) => k < dateKey && Array.isArray(schedules[k]) && schedules[k].length > 0)
+    .sort();
+
+  if (priorScheduledDates.length > 0) {
+    const mostRecentDate = priorScheduledDates[priorScheduledDates.length - 1];
+    return res.json({ dateKey, roster: schedules[mostRecentDate], isProgrammed: false, defaultedFrom: mostRecentDate });
+  }
+
+  // If no prior date, check any scheduled date
+  const allScheduledDates = Object.keys(schedules)
+    .filter((k) => Array.isArray(schedules[k]) && schedules[k].length > 0)
+    .sort();
+
+  if (allScheduledDates.length > 0) {
+    return res.json({ dateKey, roster: schedules[allScheduledDates[0]], isProgrammed: false, defaultedFrom: allScheduledDates[0] });
   }
 
   return res.json({ dateKey, roster: null, isProgrammed: false });
@@ -104,15 +110,15 @@ app.post('/api/schedules/:dateKey', (req, res) => {
     return res.status(401).json({ error: 'Unauthorized passcode' });
   }
 
-  if (!Array.isArray(roster)) {
-    return res.status(400).json({ error: 'Roster must be an array' });
-  }
-
   const schedules = readJsonSafe(SCHEDULES_FILE, {});
-  schedules[dateKey] = roster;
+  if (!Array.isArray(roster) || roster.length === 0) {
+    delete schedules[dateKey];
+  } else {
+    schedules[dateKey] = roster;
+  }
   writeJsonSafe(SCHEDULES_FILE, schedules);
 
-  res.json({ success: true, dateKey, roster });
+  res.json({ success: true, dateKey, roster: schedules[dateKey] || [] });
 });
 
 // GET all custom figures created by curators

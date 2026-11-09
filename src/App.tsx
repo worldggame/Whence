@@ -61,12 +61,13 @@ export default function App() {
         // Fall back
       }
     }
-    const merged = { ...baseSchedules, ...localSchedules };
-    const today = getEasternDateKey();
-    if (!merged[today] || merged[today].length === 0) {
-      merged[today] = getDailyPack(today);
+    const cleanLocal: Record<string, HistoricalFigure[]> = {};
+    for (const [k, v] of Object.entries(localSchedules)) {
+      if (Array.isArray(v) && v.length > 0) {
+        cleanLocal[k] = v;
+      }
     }
-    return merged;
+    return { ...baseSchedules, ...cleanLocal };
   });
 
   // Current active roster dynamically computed from activeDateKey
@@ -129,12 +130,18 @@ export default function App() {
         setActiveDateKey((prevKey) => {
           if (prevKey !== todayEastern) {
             // New day in Eastern Time arrived! Refresh schedules from server to get freshly pre-scheduled figures
-            fetch('/api/schedules')
+            fetch(`${API_BASE_URL}/api/schedules`)
               .then((res) => (res.ok ? res.json() : null))
               .then((data) => {
                 if (data && data.schedules) {
-                  setCalendarSchedules((schedules) => {
-                    const merged = { ...schedules, ...data.schedules };
+                  setCalendarSchedules(() => {
+                    const cleanSchedules: Record<string, HistoricalFigure[]> = {};
+                    for (const [k, v] of Object.entries(data.schedules as Record<string, HistoricalFigure[]>)) {
+                      if (Array.isArray(v) && v.length > 0) {
+                        cleanSchedules[k] = v;
+                      }
+                    }
+                    const merged = { ...(BUNDLED_SCHEDULES as Record<string, HistoricalFigure[]>), ...cleanSchedules };
                     localStorage.setItem('whence_calendar_schedules', JSON.stringify(merged));
                     return merged;
                   });
@@ -178,8 +185,14 @@ export default function App() {
       })
       .then((data) => {
         if (data && data.schedules) {
-          setCalendarSchedules((prev) => {
-            const merged = { ...prev, ...data.schedules };
+          setCalendarSchedules(() => {
+            const cleanSchedules: Record<string, HistoricalFigure[]> = {};
+            for (const [k, v] of Object.entries(data.schedules as Record<string, HistoricalFigure[]>)) {
+              if (Array.isArray(v) && v.length > 0) {
+                cleanSchedules[k] = v;
+              }
+            }
+            const merged = { ...(BUNDLED_SCHEDULES as Record<string, HistoricalFigure[]>), ...cleanSchedules };
             localStorage.setItem('whence_calendar_schedules', JSON.stringify(merged));
             return merged;
           });
@@ -208,7 +221,12 @@ export default function App() {
   const handleUpdateRosterForDate = (dateKey: string, newRoster: HistoricalFigure[]) => {
     // 1. Optimistic local update
     setCalendarSchedules((prev) => {
-      const updated = { ...prev, [dateKey]: newRoster };
+      const updated = { ...prev };
+      if (!newRoster || newRoster.length === 0) {
+        delete updated[dateKey];
+      } else {
+        updated[dateKey] = newRoster;
+      }
       localStorage.setItem('whence_calendar_schedules', JSON.stringify(updated));
       return updated;
     });

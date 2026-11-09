@@ -123,7 +123,17 @@ export function resolveGameRosterForDate(
     return calendarSchedules[mostRecentDate];
   }
 
-  // 4. Fallback to previous day's daily pack or today's pack
+  // 4. If no prior scheduled date before dateKey, check if any programmed date exists anywhere in calendar
+  const allScheduledDates = Object.keys(calendarSchedules)
+    .filter((k) => Array.isArray(calendarSchedules[k]) && calendarSchedules[k].length > 0)
+    .sort();
+
+  if (allScheduledDates.length > 0) {
+    const mostRecentDate = allScheduledDates[allScheduledDates.length - 1];
+    return calendarSchedules[mostRecentDate];
+  }
+
+  // 5. Fallback to previous day's daily pack or today's pack
   const prevPack = getDailyPack(prevDateKey);
   if (prevPack && prevPack.length > 0) {
     return prevPack;
