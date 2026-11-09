@@ -1,0 +1,6 @@
+{
+  "name": "whence",
+  "description": "Guess where and when historical figures were born in 10 daily rounds.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
